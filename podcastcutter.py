@@ -26,13 +26,16 @@ def get_file_name_extension(file_path):
     slash_index = file_path.rfind('/')
     if slash_index != -1:
         name = name[slash_index+1:]
-    name = name.split('.')
-    return name
+    if '.' not in name:
+        return [name, '']
+    name_ext = name.split('.')
+    if len(name_ext) == 1: name_ext.insert(0,'')
+    return name_ext
 
 def get_file_name(file_path):
     return get_file_name_extension(file_path)[0]
 
-def get_file_extenion(file_path):
+def get_file_extension(file_path):
     return get_file_name_extension(file_path)[1]
 
 def format_ms(miliseconds):
@@ -45,12 +48,11 @@ def get_episode_file(rss_url):
     random_episode = random.choice(feed['entries'])
     title = random_episode['title']
     print("Downloading: ", title)
-    print(random_episode["links"])
     site_link = random_episode['links'][0]['href']
     audio_link = random_episode['links'][1]['href']
     name_index = audio_link.rfind('/') + 1
     file_name = audio_link[name_index:]
-
+    
     response = urllib.request.urlopen(audio_link)
     data = response.read()
     with open(file_name, 'wb') as f:
@@ -83,9 +85,10 @@ def cleanup(file_path='.'):
     files = os.listdir()
     print(files)
     for file in files:
-        ext = get_file_extenion(file)
+        ext = get_file_extension(file)
         if ext == 'mp3' or ext == 'mp4':
             os.remove(file)
+            print("Deleted ", file)
 
 def create_description(timestamps, episode_url, episode_title):
     return "{title}\n{time1} - {time2}\nFragment z odncinka:\n{url}".format(title = episode_title,
@@ -99,7 +102,7 @@ def post_video(filepath, timestamps, episode_url, episode_title):
     api = twitter.Api(consumer_key=CREDENTIALS['CONSUMER_KEY'] if CREDENTIALS else os.environ['CONSUMER_KEY'],
                       consumer_secret=CREDENTIALS['CONSUMER_SECRET'] if CREDENTIALS else os.environ['CONSUMER_SECRET'],
                       access_token_key=CREDENTIALS['ACCESS_TOKEN_KEY'] if CREDENTIALS else os.environ['ACCESS_TOKEN_KEY'],
-                      access_token_secret=CREDENTIALS['ACCESS_TOKEN_KEY'] if CREDENTIALS else os.environ['ACCESS_TOKEN_SECRET'])
+                      access_token_secret=CREDENTIALS['ACCESS_TOKEN_SECRET'] if CREDENTIALS else os.environ['ACCESS_TOKEN_SECRET'])
 
     status = api.PostUpdate(description, media=filepath)
 
