@@ -1,11 +1,12 @@
-import feedparser
-import urllib.request
-import random
 import os
 import time
 import json
+import random
 import twitter
+import feedparser
+import urllib.request
 import moviepy.editor as mpy
+from bs4 import BeautifulSoup
 from pydub import AudioSegment
 from pydub.playback import play
 
@@ -17,7 +18,6 @@ def init_json(file_path):
     with open(file_path) as f:
         return json.load(f)
 
-CREDENTIALS = init_json('credentials.json')
 SECONDS = 1000
 
 
@@ -55,28 +55,38 @@ def get_episode_file(rss_url):
     file_name = audio_link[name_index:]
 
     print("Downloading episode:", title)
-    response = urllib.request.urlopen(audio_link)
-    data = response.read()
-    with open(file_name, 'wb') as f:
-        f.write(data)
+    os.system(f"wget {audio_link}")
     print("Download complete!")
     return file_name, title, site_link
 
+def get_episode_cover(site_link):
+    if site_link == "http://rozgrywkapodcast.pl/":
+        return f"logo-nowe.png"
+    page = urllib.request.urlopen(site_link).read()
+    soup = BeautifulSoup(page, 'html.parser')
+    results = soup.find(class_='attachment-post-thumbnail size-post-thumbnail wp-post-image')
+    image_url = results['src']
+    name_extension_tuple = get_file_name_extension(image_url)
+    os.system(f"wget {image_url}")
+    image_file_name = ".".join(name_extension_tuple)
+    return image_file_name
+
 def get_random_slice(file_path, slice_duration):
     loaded_episode = AudioSegment.from_mp3(file_path)
-    print("Loaded {} for slicing.".format(file_path))
+    print(f"Loaded {file_path} for slicing.")
     duration = len(loaded_episode)
     sample_duration = slice_duration * SECONDS
     random_ms = random.randrange(0, duration-sample_duration, SECONDS)
     sample = loaded_episode[random_ms:random_ms+sample_duration]
     sample = sample.fade_in(2*SECONDS)
     sample = sample.fade_out(2*SECONDS)
-    sample.export('cut_'+file_path, format='mp3')
-    print("Saved sliced file to", 'cut_'+file_path)
-    return 'cut_'+file_path, [random_ms, random_ms+sample_duration]
+    new_file_path = 'cut_' + file_path
+    sample.export(new_file_path, format='mp3')
+    print("Saved sliced file to", new_file_path)
+    return new_file_path, [random_ms, random_ms+sample_duration]
 
 def create_video(image_path, audio_path):
-    print("Loaded {}, {} to create a video".format(image_path, audio_path))
+    print(f"Loaded {image_path}, {audio_path} to create a video")
     silent_intro = mpy.ImageClip(image_path, duration=2)
     video = mpy.ImageClip(image_path, duration=10)
     audio = mpy.AudioFileClip(audio_path)
@@ -91,24 +101,23 @@ def cleanup(file_path='.'):
     print("Started cleanup.")
     files = os.listdir()
     for file in files:
+        name = get_file_name(file)
         ext = get_file_extension(file)
-        if ext == 'mp3' or ext == 'mp4':
-            os.remove(file)
-            print("Deleted ", file)
+        if name != 'logo-nowe':
+            if ext.lower() in ['mp3', 'mp4', 'png', 'jpg', 'jpeg']:
+                os.remove(file)
+                print("Deleted ", file)
 
 def create_description(timestamps, episode_url, episode_title):
-    return "{title}\n{time1} - {time2}\nPrzesłuchaj cały odcinek tutaj:\n{url}".format(title = episode_title,
-                                                                           time1 = timestamps[0],
-                                                                           time2 = timestamps[1],
-                                                                           url = episode_url)
+    return f"{episode_title}\n{timestamps[0]} - {timestamps[1]}\nPrzesłuchaj cały odcinek tutaj:\n{episode_url}"
 
 def post_video(filepath, timestamps, episode_url, episode_title):
     description = create_description(timestamps, episode_url, episode_title)
 
-    api = twitter.Api(consumer_key=CREDENTIALS['CONSUMER_KEY'] if CREDENTIALS else os.environ['CONSUMER_KEY'],
-                      consumer_secret=CREDENTIALS['CONSUMER_SECRET'] if CREDENTIALS else os.environ['CONSUMER_SECRET'],
-                      access_token_key=CREDENTIALS['ACCESS_TOKEN_KEY'] if CREDENTIALS else os.environ['ACCESS_TOKEN_KEY'],
-                      access_token_secret=CREDENTIALS['ACCESS_TOKEN_SECRET'] if CREDENTIALS else os.environ['ACCESS_TOKEN_SECRET'])
+    api = twitter.Api(consumer_key=os.environ['CONSUMER_KEY'],
+                      consumer_secret=os.environ['CONSUMER_SECRET'],
+                      access_token_key=os.environ['ACCESS_TOKEN_KEY'],
+                      access_token_secret=os.environ['ACCESS_TOKEN_SECRET'])
     print("Posted to Twitter!")
     status = api.PostUpdate(description, media=filepath)
 
@@ -131,14 +140,11 @@ def quality_control(audio_path):
             return False
 
 if __name__ == "__main__":
-    while True:
-        rozgrywka_rss = CREDENTIALS['RSS_URL'] if CREDENTIALS else os.environ['RSS_URL']
-        episode_path, episode_title, episode_url = get_episode_file(rozgrywka_rss)
-        slice_path, timestamps = get_random_slice(episode_path, 12)
-        if not quality_control(slice_path):
-            continue;
-        timestamps = list(map(format_ms, timestamps))
-        video_path = create_video("logo-nowe.png", slice_path)
-        post_video(video_path, timestamps, episode_url, episode_title)
-        cleanup()
-        break;
+    rozgrywka_rss = os.environ['RSS_URL']
+    episode_path, episode_title, episode_url = get_episode_file(rozgrywka_rss)
+    episode_cover = get_episode_cover(episode_url)
+    slice_path, timestamps = get_random_slice(episode_path, 12)
+    timestamps = list(map(format_ms, timestamps))
+    video_path = create_video(episode_cover, slice_path)
+    post_video(video_path, timestamps, episode_url, episode_title)
+    cleanup()
