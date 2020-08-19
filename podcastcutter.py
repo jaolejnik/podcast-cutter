@@ -118,8 +118,8 @@ def post_video(filepath, timestamps, episode_url, episode_title):
                       consumer_secret=os.environ['CONSUMER_SECRET'],
                       access_token_key=os.environ['ACCESS_TOKEN_KEY'],
                       access_token_secret=os.environ['ACCESS_TOKEN_SECRET'])
-    print("Posted to Twitter!")
     status = api.PostUpdate(description, media=filepath)
+    print("Posted to Twitter!")
 
 def quality_control(audio_path):
     print("Quality control.")
