@@ -18,7 +18,7 @@ def get_random_cut():
     cut_description = PATH + cut_name + ".txt"
     return cut_mp4, cut_description
 
-def post_video(filepath, descritpion):
+def post_video(filepath, description):
     api = twitter.Api(consumer_key=os.environ['CONSUMER_KEY'],
                       consumer_secret=os.environ['CONSUMER_SECRET'],
                       access_token_key=os.environ['ACCESS_TOKEN_KEY'],
@@ -29,5 +29,6 @@ def post_video(filepath, descritpion):
 if __name__ == "__main__":
     mp4_file, description_file = get_random_cut()
     print(mp4_file, description_file)
-    post_video(mp4_file, description_file)
+    description = read_description(description_file)
+    post_video(mp4_file, description)
     os.system(f"rm {mp4_file} {description_file}")
