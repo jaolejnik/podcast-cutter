@@ -2,7 +2,6 @@ import os
 import time
 import json
 import random
-import twitter
 import feedparser
 import urllib.request
 import moviepy.editor as mpy
@@ -111,15 +110,11 @@ def cleanup(file_path='.'):
 def create_description(timestamps, episode_url, episode_title):
     return f"{episode_title}\n{timestamps[0]} - {timestamps[1]}\nPrzesłuchaj cały odcinek tutaj:\n{episode_url}"
 
-def post_video(filepath, timestamps, episode_url, episode_title):
-    description = create_description(timestamps, episode_url, episode_title)
-
-    api = twitter.Api(consumer_key=os.environ['CONSUMER_KEY'],
-                      consumer_secret=os.environ['CONSUMER_SECRET'],
-                      access_token_key=os.environ['ACCESS_TOKEN_KEY'],
-                      access_token_secret=os.environ['ACCESS_TOKEN_SECRET'])
-    status = api.PostUpdate(description, media=filepath)
-    print("Posted to Twitter!")
+def save_description(video_path, description):
+    filename = get_file_name(video_path) + '.txt'
+    with open(filename, 'w') as f:
+        f.write(description)
+    return filename
 
 def quality_control(audio_path):
     print("Quality control.")
@@ -140,11 +135,14 @@ def quality_control(audio_path):
             return False
 
 if __name__ == "__main__":
-    rozgrywka_rss = os.environ['RSS_URL']
-    episode_path, episode_title, episode_url = get_episode_file(rozgrywka_rss)
-    episode_cover = get_episode_cover(episode_url)
-    slice_path, timestamps = get_random_slice(episode_path, 12)
-    timestamps = list(map(format_ms, timestamps))
-    video_path = create_video(episode_cover, slice_path)
-    post_video(video_path, timestamps, episode_url, episode_title)
-    cleanup()
+    for i in range(50):
+        rozgrywka_rss = os.environ['RSS_URL']
+        episode_path, episode_title, episode_url = get_episode_file(rozgrywka_rss)
+        episode_cover = get_episode_cover(episode_url)
+        slice_path, timestamps = get_random_slice(episode_path, 12)
+        timestamps = list(map(format_ms, timestamps))
+        video_path = create_video(episode_cover, slice_path)
+        description = create_description(timestamps, episode_url, episode_title)
+        description_path = save_description(video_path, description)
+        os.system(f"mkdir -p ./quality_control && mv {video_path} {description_path} ./quality_control" )
+        cleanup()
