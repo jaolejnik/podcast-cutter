@@ -33,7 +33,7 @@ days_to_episode = (date_obj - now).days
 day_word = "dni" if days_to_episode > 1 else "dzień"
 when_str = f"za {days_to_episode} {day_word}" if days_to_episode > 0 else "dziś"
 
-message = f"{event['summary']} już {when_str}!"
+message = f"[{datetime.datetime.now().date()}]\n{event['summary']} już {when_str}!"
 
 print(message)
 api = twitter.Api(consumer_key=os.environ['CONSUMER_KEY'],
